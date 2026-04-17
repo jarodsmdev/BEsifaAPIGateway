@@ -31,6 +31,12 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
+        if (request.getMethod().name().equals("OPTIONS")) {
+            log.info("[+] Preflight CORS permitido: {}", path);
+            exchange.getResponse().setStatusCode(HttpStatus.OK);
+            return exchange.getResponse().setComplete();
+        }
+
         // Rutas públicas (no requieren token)
         if (path.startsWith("/auth/login") || path.startsWith("/auth/register")) {
             log.info("[+] Ruta pública: {}", path);
@@ -55,7 +61,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         }
 
         String username = jwtUtil.extractUsername(token);
-        log.info("[+] Token válido para: {}", username);
+        log.info("[+] Token válido usuario: {}", username);
 
         // [!] Mantener el token original Y agregar el usuario
         ServerHttpRequest mutatedRequest = request.mutate()
@@ -69,8 +75,15 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
     private Mono<Void> unauthorizedResponse(ServerWebExchange exchange) {
         ServerHttpResponse response = exchange.getResponse();
+
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        String body = "{\"error\": \"No autorizado\", \"message\": \"Token inválido o no proporcionado\"}";
-        return response.writeWith(Mono.just(response.bufferFactory().wrap(body.getBytes())));
+        //response.getHeaders().set("Access-Control-Allow-Origin", "http://127.0.0.1:3000");
+        response.getHeaders().set("Content-Type", "application/json");
+
+        String body = "{\"error\":\"No autorizado\",\"message\":\"Token inválido o no proporcionado\"}";
+
+        return response.writeWith(
+                Mono.just(response.bufferFactory().wrap(body.getBytes()))
+        );
     }
 }

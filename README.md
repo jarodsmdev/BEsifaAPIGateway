@@ -8,7 +8,7 @@ API Gateway desarrollado con Spring Cloud Gateway que actúa como punto único d
 ## 🏗️ Arquitectura
 
 ```
-Cliente → API Gateway (8080) → Microservicios
+Cliente → API Gateway (9000) → Microservicios
 ├── Auth Service (8081)
 ├── Plate Service (8082)
 └── Dashboard Service (8083)

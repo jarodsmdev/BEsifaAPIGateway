@@ -10,6 +10,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -52,13 +53,19 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
             errorDetails.put("error", "Gateway Timeout");
             errorDetails.put("message", "El servicio destino no respondió a tiempo");
         }
+        else if (ex instanceof NoResourceFoundException) {
+            status = HttpStatus.NOT_FOUND;
+            errorDetails.put("status", 404);
+            errorDetails.put("error", "Not Found");
+            errorDetails.put("message", "No existe ruta para este endpoint en el gateway");
+        }
         // Otros errores
         else {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
             errorDetails.put("status", 500);
             errorDetails.put("error", "Error interno");
             errorDetails.put("message", "Ha ocurrido un error interno en el gateway");
-            log.error("[!] Error no manejado: ", ex);
+            log.error("[!] Error no manejado: ", ex.getMessage());
         }
 
         try {

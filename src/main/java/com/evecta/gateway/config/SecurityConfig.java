@@ -28,7 +28,7 @@ public class SecurityConfig {
 
                 // [!] IMPORTANTE: Deshabilitar la autenticación reactiva por defecto
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
-
+                .cors(cors -> {})
                 // Configurar autorización
                 .authorizeExchange(exchanges -> exchanges
                         .anyExchange().permitAll()  // JwtAuthenticationFilter maneja la seguridad

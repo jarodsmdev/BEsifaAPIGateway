@@ -1,7 +1,7 @@
 # Renombra este archivo a .env y completa los valores de las variables de entorno
 
 APP_NAME=YOUR_APP_NAME
-SERVER_PORT=8080
+SERVER_PORT=9000
 JWT_SECRET=YOU_JWT_SECRET_KEY
 AUTH_SERVICE_URL=http://localhost:8081
 PLATE_SERVICE_URL=http://localhost:8082
