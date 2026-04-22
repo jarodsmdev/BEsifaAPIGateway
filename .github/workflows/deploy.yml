@@ -1,0 +1,49 @@
+name: Build and Push to Docker Hub
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build image
+        run: |
+          docker build -t jarodsm/sifa-api-gateway:latest \
+                       -t jarodsm/sifa-api-gateway:${{ github.sha }} .
+
+      - name: Push image
+        run: |
+          docker push jarodsm/sifa-api-gateway:latest
+          docker push jarodsm/sifa-api-gateway:${{ github.sha }}
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull jarodsm/sifa-api-gateway:${{ github.sha }}
+
+            docker rm -f sifa-api-gateway || true
+
+            docker run -d -p 80:9000 \
+              --restart unless-stopped \
+              -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+              -e AUTH_SERVICE_URL='${{ secrets.AUTH_SERVICE_URL }}' \
+              -e PLATE_SERVICE_URL='${{ secrets.PLATE_SERVICE_URL }}' \
+              -e DASHBOARD_SERVICE_URL='${{ secrets.DASHBOARD_SERVICE_URL }}' \
+              --name sifa-api-gateway \
+              jarodsm/sifa-api-gateway:${{ github.sha }}
