@@ -38,8 +38,8 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         }
 
         // Rutas públicas (no requieren token)
-        if (path.startsWith("/auth/login") || path.startsWith("/auth/register")) {
-            log.info("[+] Ruta pública: {}", path);
+        if (path.startsWith("/auth/api/v1/")) {
+            log.info("[+] Ruta pública (auth): {}", path);
             return chain.filter(exchange);
         }
 
