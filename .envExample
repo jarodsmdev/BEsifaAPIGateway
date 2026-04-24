@@ -1,8 +1,0 @@
-# Renombra este archivo a .env y completa los valores de las variables de entorno
-
-APP_NAME=API_GATEWAY
-SERVER_PORT=9000
-JWT_SECRET=YOU_JWT_SECRET_KEY
-AUTH_SERVICE_URL=http://localhost:8081
-PLATE_SERVICE_URL=http://localhost:8082
-DASHBOARD_SERVICE_URL=http://localhost:8083
