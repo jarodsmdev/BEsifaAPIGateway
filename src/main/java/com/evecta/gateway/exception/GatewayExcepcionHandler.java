@@ -13,7 +13,8 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-
+import org.springframework.lang.NonNull;
+import java.util.Objects;
 import java.net.ConnectException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -27,7 +28,9 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
+    @NonNull
+    @SuppressWarnings("null")
+    public Mono<Void> handle(@NonNull ServerWebExchange exchange, @NonNull Throwable ex) {
         ServerHttpResponse response = exchange.getResponse();
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
@@ -43,7 +46,8 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
             status = HttpStatus.SERVICE_UNAVAILABLE;
             errorDetails.put("status", 503);
             errorDetails.put("error", "Servicio no disponible");
-            errorDetails.put("message", "El servicio de autenticación no está disponible. ¿Está corriendo el auth-service en el puerto 8081?");
+            errorDetails.put("message",
+                    "El servicio de autenticación no está disponible. ¿Está corriendo el auth-service en el puerto 8081?");
             log.error("[!] Auth-service no disponible en puerto 8081");
         }
         // Timeout
@@ -52,8 +56,7 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
             errorDetails.put("status", 504);
             errorDetails.put("error", "Gateway Timeout");
             errorDetails.put("message", "El servicio destino no respondió a tiempo");
-        }
-        else if (ex instanceof NoResourceFoundException) {
+        } else if (ex instanceof NoResourceFoundException) {
             status = HttpStatus.NOT_FOUND;
             errorDetails.put("status", 404);
             errorDetails.put("error", "Not Found");
@@ -69,8 +72,8 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
         }
 
         try {
-            byte[] bytes = objectMapper.writeValueAsBytes(errorDetails);
-            DataBuffer buffer = response.bufferFactory().wrap(bytes);
+            byte[] bytes = Objects.requireNonNull(objectMapper.writeValueAsBytes(errorDetails));
+            DataBuffer buffer = Objects.requireNonNull(response.bufferFactory().wrap(bytes));
             response.setStatusCode(status);
             return response.writeWith(Mono.just(buffer));
         } catch (Exception e) {

@@ -40,10 +40,10 @@ public class GatewayApplication {
                     .getFirst("X-Forwarded-For");
 
             if (clientIp == null) {
-                clientIp = exchange.getRequest()
-                        .getRemoteAddress()
-                        .getAddress()
-                        .getHostAddress();
+                var remoteAddress = exchange.getRequest().getRemoteAddress();
+                clientIp = (remoteAddress != null && remoteAddress.getAddress() != null)
+                        ? remoteAddress.getAddress().getHostAddress()
+                        : "UNKNOWN";
             }
 
             log.info("═══════════════════════════════════════");
@@ -54,11 +54,11 @@ public class GatewayApplication {
 
                 long duration = System.currentTimeMillis() - startTime;
 
-                URI routedUri = exchange.getAttribute(GATEWAY_REQUEST_URL_ATTR);
+                URI routedUriAttr = exchange.getAttribute(java.util.Objects.requireNonNull(GATEWAY_REQUEST_URL_ATTR));
+                String routedUri = routedUriAttr != null ? routedUriAttr.toString() : "UNKNOWN";
 
-                String routeId = exchange.getAttribute(GATEWAY_ROUTE_ATTR) != null
-                        ? exchange.getAttribute(GATEWAY_ROUTE_ATTR).toString()
-                        : "UNKNOWN";
+                Object routeAttr = exchange.getAttribute(java.util.Objects.requireNonNull(GATEWAY_ROUTE_ATTR));
+                String routeId = routeAttr != null ? routeAttr.toString() : "UNKNOWN";
 
                 var status = exchange.getResponse().getStatusCode();
 

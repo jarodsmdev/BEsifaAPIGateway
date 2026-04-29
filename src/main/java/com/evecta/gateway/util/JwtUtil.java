@@ -68,7 +68,7 @@ public class JwtUtil {
         }
     }
 
-    // Extrae la lista de roles desde el Payload del JWT
+    @SuppressWarnings("unchecked")
     public List<String> extractRoles(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(getSigningKey())
@@ -77,7 +77,7 @@ public class JwtUtil {
                 .getPayload();
 
         // Extraemos el claim "roles" y lo casteamos a una lista de Strings
-        return claims.get("roles", List.class);
+        return (List<String>) claims.get("roles", List.class);
     }
 
     /**

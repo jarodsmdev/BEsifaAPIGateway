@@ -15,6 +15,7 @@ import com.evecta.gateway.util.JwtUtil;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Objects;
 
 @Component
 @Order(-100)
@@ -69,15 +70,16 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
         // [!] Mantener el token original Y agregar el usuario
         ServerHttpRequest mutatedRequest = request.mutate()
-                .header(AUTH_HEADER, authHeader)        // Mantiene el token original
-                .header("X-Auth-User", username)        // Agrega usuario para logging
-                .header("X-Auth-Roles", rolesString)    // Indica roles
-                .header("X-Auth-Token-Valid", "true")   // Indica que el token es válido
+                .header(AUTH_HEADER, authHeader) // Mantiene el token original
+                .header("X-Auth-User", username) // Agrega usuario para logging
+                .header("X-Auth-Roles", rolesString) // Indica roles
+                .header("X-Auth-Token-Valid", "true") // Indica que el token es válido
                 .build();
 
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
     }
 
+    @SuppressWarnings("null")
     private Mono<Void> unauthorizedResponse(ServerWebExchange exchange) {
         ServerHttpResponse response = exchange.getResponse();
 
@@ -89,6 +91,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         String body = "{\"error\":\"No autorizado\",\"message\":\"Token inválido o no proporcionado\"}";
 
         return response.writeWith(
-                Mono.just(response.bufferFactory().wrap(body.getBytes())));
+                Objects.requireNonNull(Mono.just(Objects
+                        .requireNonNull(response.bufferFactory().wrap(Objects.requireNonNull(body.getBytes()))))));
     }
 }
