@@ -33,7 +33,7 @@ public class JwtUtil {
     }
 
     /**
-     *  SOLO VALIDA - NO GENERA TOKENS
+     * SOLO VALIDA - NO GENERA TOKENS
      * El auth-service es el único que debe generar tokens
      */
     public boolean validateToken(String token) {

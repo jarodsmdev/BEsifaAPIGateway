@@ -65,9 +65,9 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
         // [!] Mantener el token original Y agregar el usuario
         ServerHttpRequest mutatedRequest = request.mutate()
-                .header(AUTH_HEADER, authHeader)        // Mantiene el token original
-                .header("X-Auth-User", username)        // Agrega usuario para logging
-                .header("X-Auth-Token-Valid", "true")   // Indica que el token es válido
+                .header(AUTH_HEADER, authHeader) // Mantiene el token original
+                .header("X-Auth-User", username) // Agrega usuario para logging
+                .header("X-Auth-Token-Valid", "true") // Indica que el token es válido
                 .build();
 
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
@@ -77,13 +77,13 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         ServerHttpResponse response = exchange.getResponse();
 
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        //response.getHeaders().set("Access-Control-Allow-Origin", "http://127.0.0.1:3000");
+        // response.getHeaders().set("Access-Control-Allow-Origin",
+        // "http://127.0.0.1:3000");
         response.getHeaders().set("Content-Type", "application/json");
 
         String body = "{\"error\":\"No autorizado\",\"message\":\"Token inválido o no proporcionado\"}";
 
         return response.writeWith(
-                Mono.just(response.bufferFactory().wrap(body.getBytes()))
-        );
+                Mono.just(response.bufferFactory().wrap(body.getBytes())));
     }
 }
