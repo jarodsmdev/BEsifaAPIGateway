@@ -14,6 +14,8 @@ import org.springframework.web.server.ServerWebExchange;
 import com.evecta.gateway.util.JwtUtil;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @Component
 @Order(-100)
 @AllArgsConstructor
@@ -61,13 +63,16 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         }
 
         String username = jwtUtil.extractUsername(token);
-        log.info("[+] Token válido usuario: {}", username);
+        List<String> rolesList = jwtUtil.extractRoles(token);
+        String rolesString = rolesList != null ? String.join(",", rolesList) : "";
+        log.info("[+] Token válido. Usuario: {} | Roles: {}", username, rolesString);
 
         // [!] Mantener el token original Y agregar el usuario
         ServerHttpRequest mutatedRequest = request.mutate()
-                .header(AUTH_HEADER, authHeader) // Mantiene el token original
-                .header("X-Auth-User", username) // Agrega usuario para logging
-                .header("X-Auth-Token-Valid", "true") // Indica que el token es válido
+                .header(AUTH_HEADER, authHeader)        // Mantiene el token original
+                .header("X-Auth-User", username)        // Agrega usuario para logging
+                .header("X-Auth-Roles", rolesString)    // Indica roles
+                .header("X-Auth-Token-Valid", "true")   // Indica que el token es válido
                 .build();
 
         return chain.filter(exchange.mutate().request(mutatedRequest).build());

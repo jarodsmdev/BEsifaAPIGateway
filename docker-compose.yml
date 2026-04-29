@@ -6,3 +6,9 @@ services:
       - "9000:9000"
     env_file:
       - .env
+    networks:
+      - sifa-network  # ← Usar red externa
+
+networks:
+  sifa-network:
+    external: true  # ← Indicar que es externa

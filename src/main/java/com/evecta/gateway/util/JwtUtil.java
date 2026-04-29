@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 
 @Component
 public class JwtUtil {
@@ -65,6 +66,18 @@ public class JwtUtil {
             log.error("Error extrayendo username del token: {}", e.getMessage());
             return null;
         }
+    }
+
+    // Extrae la lista de roles desde el Payload del JWT
+    public List<String> extractRoles(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        // Extraemos el claim "roles" y lo casteamos a una lista de Strings
+        return claims.get("roles", List.class);
     }
 
     /**
