@@ -46,9 +46,8 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
             status = HttpStatus.SERVICE_UNAVAILABLE;
             errorDetails.put("status", 503);
             errorDetails.put("error", "Servicio no disponible");
-            errorDetails.put("message",
-                    "El servicio de autenticación no está disponible. ¿Está corriendo el auth-service en el puerto 8081?");
-            log.error("[!] Auth-service no disponible en puerto 8081");
+            errorDetails.put("message", "Fallo de conexión al enviar la petición a la ruta: " + exchange.getRequest().getURI().getPath());
+            log.error("[!] Connection Refused en ruta: {}", exchange.getRequest().getURI().getPath());
         }
         // Timeout
         else if (ex.getMessage() != null && ex.getMessage().contains("timeout")) {
