@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 import org.springframework.lang.NonNull;
 import java.util.Objects;
 import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,7 +47,8 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
             status = HttpStatus.SERVICE_UNAVAILABLE;
             errorDetails.put("status", 503);
             errorDetails.put("error", "Servicio no disponible");
-            errorDetails.put("message", "Fallo de conexión al enviar la petición a la ruta: " + exchange.getRequest().getURI().getPath());
+            errorDetails.put("message",
+                    "Fallo de conexión al enviar la petición a la ruta: " + exchange.getRequest().getURI().getPath());
             log.error("[!] Connection Refused en ruta: {}", exchange.getRequest().getURI().getPath());
         }
         // Timeout
@@ -60,14 +62,27 @@ public class GatewayExcepcionHandler implements ErrorWebExceptionHandler {
             errorDetails.put("status", 404);
             errorDetails.put("error", "Not Found");
             errorDetails.put("message", "No existe ruta para este endpoint en el gateway");
+        } else if (ex instanceof UnknownHostException ||
+                (ex.getCause() instanceof UnknownHostException) ||
+                (ex.getMessage() != null && ex.getMessage().contains("Failed to resolve"))) {
+
+            status = HttpStatus.SERVICE_UNAVAILABLE;
+
+            errorDetails.put("status", 503);
+            errorDetails.put("error", "Servicio no encontrado");
+            errorDetails.put("message",
+                    "No se pudo resolver el host del microservicio destino");
+
+            log.error("[!] UnknownHostException: {}", ex.getMessage());
         }
+
         // Otros errores
         else {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
             errorDetails.put("status", 500);
             errorDetails.put("error", "Error interno");
             errorDetails.put("message", "Ha ocurrido un error interno en el gateway");
-            log.error("[!] Error no manejado: ", ex.getMessage());
+            log.error("[!] Error no manejado: ", ex);
         }
 
         try {
