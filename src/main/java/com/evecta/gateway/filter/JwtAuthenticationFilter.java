@@ -11,6 +11,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import com.evecta.gateway.service.TokenValidationService;
 import com.evecta.gateway.util.JwtUtil;
 import reactor.core.publisher.Mono;
 
@@ -28,6 +29,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtUtil jwtUtil;
+    private final TokenValidationService tokenValidationService;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -59,24 +61,31 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         String token = authHeader.substring(BEARER_PREFIX.length());
 
         if (!jwtUtil.validateToken(token)) {
-            log.warn("[-] Token inválido");
+            log.warn("[-] Token inválido (firma/expiración)");
             return unauthorizedResponse(exchange);
         }
 
-        String username = jwtUtil.extractUsername(token);
-        List<String> rolesList = jwtUtil.extractRoles(token);
-        String rolesString = rolesList != null ? String.join(",", rolesList) : "";
-        log.info("[+] Token válido. Usuario: {} | Roles: {}", username, rolesString);
+        return tokenValidationService.isTokenValid(token)
+                .flatMap(isValid -> {
+                    if (!isValid) {
+                        log.warn("[-] Token revocado o no válido en base de datos");
+                        return unauthorizedResponse(exchange);
+                    }
 
-        // [!] Mantener el token original Y agregar el usuario
-        ServerHttpRequest mutatedRequest = request.mutate()
-                .header(AUTH_HEADER, authHeader) // Mantiene el token original
-                .header("X-Auth-User", username) // Agrega usuario para logging
-                .header("X-Auth-Roles", rolesString) // Indica roles
-                .header("X-Auth-Token-Valid", "true") // Indica que el token es válido
-                .build();
+                    String username = jwtUtil.extractUsername(token);
+                    List<String> rolesList = jwtUtil.extractRoles(token);
+                    String rolesString = rolesList != null ? String.join(",", rolesList) : "";
+                    log.info("[+] Token válido. Usuario: {} | Roles: {}", username, rolesString);
 
-        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                    ServerHttpRequest mutatedRequest = request.mutate()
+                            .header(AUTH_HEADER, authHeader)
+                            .header("X-Auth-User", username)
+                            .header("X-Auth-Roles", rolesString)
+                            .header("X-Auth-Token-Valid", "true")
+                            .build();
+
+                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                });
     }
 
     @SuppressWarnings("null")
