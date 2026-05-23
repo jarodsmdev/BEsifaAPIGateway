@@ -9,9 +9,12 @@ import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
-@Slf4j
 public class TokenValidationService {
+    private static final Logger log = LoggerFactory.getLogger(TokenValidationService.class);
 
     private final WebClient webClient;
 
@@ -20,7 +23,7 @@ public class TokenValidationService {
         this.webClient = webClientBuilder.baseUrl(authServiceUrl).build();
     }
 
-    public Mono<Boolean> isTokenValid(String token) {
+    public Mono<String> validateToken(String token) {
         return webClient.get()
                 .uri("/auth/api/v1/validate")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -30,15 +33,15 @@ public class TokenValidationService {
                     Boolean valid = (Boolean) response.get("valid");
                     if (valid != null && valid) {
                         log.info("[+] Token válido según auth-service");
-                        return true;
+                        return "valid";
                     }
                     String error = (String) response.get("error");
                     log.warn("[-] Token inválido según auth-service: {}", error);
-                    return false;
+                    return error != null ? error : "Token inválido";
                 })
                 .onErrorResume(e -> {
                     log.error("[-] Error al validar token con auth-service: {}", e.getMessage());
-                    return Mono.just(false);
+                    return Mono.just("Error de conexión con servicio de autenticación");
                 });
     }
 }
