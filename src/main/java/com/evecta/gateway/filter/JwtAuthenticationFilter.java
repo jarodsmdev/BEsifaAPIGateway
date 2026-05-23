@@ -1,6 +1,5 @@
 package com.evecta.gateway.filter;
 
-import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -20,7 +19,6 @@ import java.util.Objects;
 
 @Component
 @Order(-100)
-@AllArgsConstructor
 public class JwtAuthenticationFilter implements GlobalFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
@@ -30,6 +28,11 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
     private final JwtUtil jwtUtil;
     private final TokenValidationService tokenValidationService;
+
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, TokenValidationService tokenValidationService) {
+        this.jwtUtil = jwtUtil;
+        this.tokenValidationService = tokenValidationService;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -55,21 +58,31 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             log.warn("[-] Token no proporcionado");
-            return unauthorizedResponse(exchange);
+            return unauthorizedResponse(exchange, "Token no proporcionado");
         }
 
         String token = authHeader.substring(BEARER_PREFIX.length());
 
         if (!jwtUtil.validateToken(token)) {
-            log.warn("[-] Token inválido (firma/expiración)");
-            return unauthorizedResponse(exchange);
+            log.warn("[-] Token inválido o expirado localmente (firma/expiración)");
+            return unauthorizedResponse(exchange, "Token inválido o expirado");
         }
 
-        return tokenValidationService.isTokenValid(token)
-                .flatMap(isValid -> {
-                    if (!isValid) {
-                        log.warn("[-] Token revocado o no válido en base de datos");
-                        return unauthorizedResponse(exchange);
+        return tokenValidationService.validateToken(token)
+                .flatMap(validationResult -> {
+                    if (!"valid".equals(validationResult)) {
+                        log.warn("[-] Token revocado o no válido en base de datos: {}", validationResult);
+                        
+                        String friendlyMessage = "Token inválido o no proporcionado";
+                        if ("Token ha sido revocado".equals(validationResult)) {
+                            friendlyMessage = "Se ha iniciado sesión en otro dispositivo o su sesión ha sido invalidada.";
+                        } else if ("Token ha expirado".equals(validationResult)) {
+                            friendlyMessage = "Su sesión ha expirado.";
+                        } else if (validationResult != null && validationResult.contains("conexión")) {
+                            friendlyMessage = "Error de conexión con el servicio de autenticación.";
+                        }
+                        
+                        return unauthorizedResponse(exchange, friendlyMessage);
                     }
 
                     String username = jwtUtil.extractUsername(token);
@@ -89,7 +102,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
     }
 
     @SuppressWarnings("null")
-    private Mono<Void> unauthorizedResponse(ServerWebExchange exchange) {
+    private Mono<Void> unauthorizedResponse(ServerWebExchange exchange, String message) {
         ServerHttpResponse response = exchange.getResponse();
 
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
@@ -97,7 +110,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         // "http://127.0.0.1:3000");
         response.getHeaders().set("Content-Type", "application/json");
 
-        String body = "{\"error\":\"No autorizado\",\"message\":\"Token inválido o no proporcionado\"}";
+        String body = String.format("{\"error\":\"No autorizado\",\"message\":\"%s\"}", message);
 
         return response.writeWith(
                 Objects.requireNonNull(Mono.just(Objects
