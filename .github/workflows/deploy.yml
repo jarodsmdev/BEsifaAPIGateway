@@ -10,49 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Install Doppler
       - name: Install Doppler CLI
         uses: dopplerhq/cli-action@v3
 
-      # Download ALL secrets from Doppler
-      - name: Download Doppler secrets
+      - name: Export secrets from Doppler
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         run: |
           doppler secrets download \
             --no-file \
-            --format env > doppler.env
+            --format json | jq -r '
+              to_entries[]
+              | "\(.key)<<EOF\n\(.value)\nEOF"
+            ' >> $GITHUB_ENV
 
-      # Export Doppler secrets to GitHub Actions env
-      - name: Export secrets
-        run: |
-          while IFS= read -r line; do
-            echo "$line" >> $GITHUB_ENV
-          done < doppler.env
-
-      # Docker Hub login
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
 
-      # Build image
       - name: Build Docker image
         run: |
           docker build \
             -t jarodsm/sifa-gateway:latest .
 
-      # Push image
       - name: Push Docker image
         run: |
           docker push jarodsm/sifa-gateway:latest
 
-      # Generate runtime env file
       - name: Generate runtime env
         run: |
           cat > gateway.env <<EOF
@@ -63,7 +52,6 @@ jobs:
           CORE_SERVICE_URL=${CORE_SERVICE_URL}
           EOF
 
-      # Copy env file to server
       - name: Copy env file
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -73,7 +61,6 @@ jobs:
           source: "gateway.env"
           target: "/tmp"
 
-      # Deploy remotely
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
