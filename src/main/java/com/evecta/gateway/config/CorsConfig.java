@@ -19,6 +19,7 @@ public class CorsConfig {
                 config.setAllowedOrigins(List.of(
                                 "http://localhost:5173",
                                 "https://sifacore.netlify.app",
+                                "https://sifacore2.netlify.app",
                                 "http://sifacore.s3-website-us-east-1.amazonaws.com",
                                 "https://sifacore.s3.us-east-1.amazonaws.com"
                         ));
