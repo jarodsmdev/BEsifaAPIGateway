@@ -1,49 +1,89 @@
-name: Build and Push to Docker Hub
+name: Build and Deploy Gateway
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - prod
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Export secrets from Doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          doppler secrets download \
+            --no-file \
+            --format json | jq -r '
+              to_entries[]
+              | "\(.key)<<EOF\n\(.value)\nEOF"
+            ' >> $GITHUB_ENV
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
-      - name: Build image
+      - name: Build Docker image
         run: |
-          docker build -t jarodsm/sifa-api-gateway:latest \
-                       -t jarodsm/sifa-api-gateway:${{ github.sha }} .
+          docker build \
+            -t jarodsm/sifa-gateway:latest .
 
-      - name: Push image
+      - name: Push Docker image
         run: |
-          docker push jarodsm/sifa-api-gateway:latest
-          docker push jarodsm/sifa-api-gateway:${{ github.sha }}
+          docker push jarodsm/sifa-gateway:latest
+
+      - name: Generate runtime env
+        run: |
+          cat > gateway.env <<EOF
+          JWT_SECRET=${JWT_SECRET}
+          AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+          PLATE_SERVICE_URL=${PLATE_SERVICE_URL}
+          DASHBOARD_SERVICE_URL=${DASHBOARD_SERVICE_URL}
+          CORE_SERVICE_URL=${CORE_SERVICE_URL}
+          EOF
+
+      - name: Copy env file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.EC2_HOST }}
+          username: ubuntu
+          key: ${{ env.EC2_SSH_KEY }}
+          source: "gateway.env"
+          target: "/tmp"
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ env.EC2_HOST }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ env.EC2_SSH_KEY }}
           script: |
-            docker pull jarodsm/sifa-api-gateway:${{ github.sha }}
+            set -e
 
-            docker rm -f sifa-api-gateway || true
+            trap "rm -f /tmp/gateway.env" EXIT
 
-            docker run -d -p 80:9000 \
+            echo "Pulling latest image..."
+            docker pull jarodsm/sifa-gateway:latest
+
+            echo "Stopping old container..."
+            docker rm -f sifa-gateway || true
+
+            echo "Starting new container..."
+            docker run -d \
+              -p 80:9000 \
               --restart unless-stopped \
-              -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
-              -e AUTH_SERVICE_URL='${{ secrets.AUTH_SERVICE_URL }}' \
-              -e PLATE_SERVICE_URL='${{ secrets.PLATE_SERVICE_URL }}' \
-              -e DASHBOARD_SERVICE_URL='${{ secrets.DASHBOARD_SERVICE_URL }}' \
-              --name sifa-api-gateway \
-              jarodsm/sifa-api-gateway:${{ github.sha }}
+              --env-file /tmp/gateway.env \
+              --name sifa-gateway \
+              jarodsm/sifa-gateway:latest
+
+            echo "Deployment completed successfully."
