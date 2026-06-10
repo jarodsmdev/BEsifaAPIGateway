@@ -52,6 +52,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         }
 
         if (path.startsWith("/swagger-ui") ||
+                path.contains("/openapi.json") ||
                 path.contains("/v3/api-docs") ||
                 path.equals("/swagger-ui.html") ||
                 path.startsWith("/webjars")) {
