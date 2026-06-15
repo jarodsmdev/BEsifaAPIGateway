@@ -47,7 +47,7 @@ public class GatewayApplication {
             }
 
             log.info("═══════════════════════════════════════");
-            log.info("[➡️ REQUEST] {} {}", method, originalUri);
+            log.info("[REQUEST] {} {}", method, originalUri);
             log.info("  → IP Cliente: {}", clientIp.split(",")[0]);
 
             return chain.filter(exchange).then(Mono.fromRunnable(() -> {
@@ -62,7 +62,7 @@ public class GatewayApplication {
 
                 var status = exchange.getResponse().getStatusCode();
 
-                log.info("[⬅️ RESPONSE]");
+                log.info("[RESPONSE]");
                 log.info("  → Route ID: {}", routeId);
                 log.info("  → Destino: {} {}", method, routedUri);
                 log.info("  → Status: {} | Tiempo: {} ms", status, duration);
