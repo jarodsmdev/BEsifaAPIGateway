@@ -1,6 +1,7 @@
 package com.evecta.gateway.filter;
 
 import com.evecta.gateway.config.RateLimitProperties;
+import com.evecta.gateway.ratelimit.RateLimitResult;
 import com.evecta.gateway.ratelimit.RateLimitRule;
 import com.evecta.gateway.ratelimit.RateLimiter;
 import org.slf4j.Logger;
@@ -49,11 +50,12 @@ public class RateLimitingFilter implements GlobalFilter {
         for (RateLimitRule rule : properties.getRules()) {
             if (pathMatcher.match(rule.getPathPattern(), path)) {
                 String key = clientIp + ":" + rule.getPathPattern();
-                if (!rateLimiter.isAllowed(key, rule.getMaxRequests(), rule.getWindowSeconds())) {
-                    log.warn("[RATE LIMIT BLOCKED] IP {} | {}/{} en {}s | regla={}",
-                            clientIp, rule.getMaxRequests(), rule.getMaxRequests(),
-                            rule.getWindowSeconds(), rule.getPathPattern());
-                    return rateLimitExceededResponse(exchange, rule.getWindowSeconds());
+                RateLimitResult result = rateLimiter.isAllowed(key, rule.getMaxRequests(), rule.getWindowSeconds());
+                if (!result.allowed()) {
+                    log.warn("[RATE LIMIT BLOCKED] IP={} | método={} | ruta={} | {}/{} en {}s | regla={}",
+                            clientIp, request.getMethod(), path,
+                            result.currentCount(), result.limit(), result.windowSeconds(), rule.getPathPattern());
+                    return rateLimitExceededResponse(exchange, result.windowSeconds());
                 }
                 break;
             }

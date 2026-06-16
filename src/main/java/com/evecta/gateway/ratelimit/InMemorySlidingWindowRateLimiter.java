@@ -17,28 +17,26 @@ public class InMemorySlidingWindowRateLimiter implements RateLimiter {
     private final ConcurrentHashMap<String, Deque<Long>> storage = new ConcurrentHashMap<>();
 
     @Override
-    public boolean isAllowed(String key, int maxRequests, long windowSeconds) {
+    public RateLimitResult isAllowed(String key, int maxRequests, long windowSeconds) {
         long now = System.currentTimeMillis();
         long windowStart = now - (windowSeconds * 1000);
 
         AtomicBoolean allowed = new AtomicBoolean(false);
+        int[] currentCount = new int[1];
 
         storage.compute(key, (k, deque) -> {
             if (deque == null) deque = new LinkedList<>();
             while (!deque.isEmpty() && deque.peekFirst() < windowStart) deque.pollFirst();
-            if (deque.size() < maxRequests) {
+            currentCount[0] = deque.size();
+            if (currentCount[0] < maxRequests) {
                 deque.addLast(now);
+                currentCount[0]++;
                 allowed.set(true);
             }
             return deque;
         });
 
-        if (log.isDebugEnabled() && allowed.get()) {
-            int count = storage.get(key).size();
-            log.debug("[RATE LIMIT] {} | {}/{} en {}s", key, count, maxRequests, windowSeconds);
-        }
-
-        return allowed.get();
+        return new RateLimitResult(allowed.get(), currentCount[0], maxRequests, windowSeconds);
     }
 
     @Scheduled(fixedRate = 300000)
