@@ -1,4 +1,3 @@
-```markdown
 # API Gateway - Servicio de Enrutamiento y Autenticación
 
 ## 📋 Descripción
@@ -135,41 +134,94 @@ java -jar target/gateway-0.0.1-SNAPSHOT.jar
 
 ## 🧪 Pruebas
 
-### Login (ruta pública)
+### Pruebas Manuales (curl)
 
+#### Login (ruta pública)
 ```bash
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:9000/auth/api/v1/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"123456"}'
+  -H "X-Client-Origin: postman" \
+  -d '{"email":"[EMAIL_ADDRESS]","password":"[PASSWORD]"}'
 ```
 
-### Ruta protegida con token
-
+#### Ruta protegida con token
 ```bash
 TOKEN="eyJhbGciOiJIUzI1NiIs..."
 
-curl -X GET http://localhost:8080/api/v1/plate/detect \
+curl -X GET http://localhost:9000/core/api/v1/health \
   -H "Authorization: Bearer ${TOKEN}"
 ```
+
+---
+
+### Pruebas Automatizadas (Suite de Tests)
+
+El proyecto cuenta con una suite completa de pruebas unitarias y de integración que validan el correcto funcionamiento de la seguridad del gateway (JWT local, propagación de cabeceras, CORS, Rate Limiting y enrutamiento).
+
+#### Prerrequisitos de Integración
+Las pruebas de integración (`GatewayIntegrationTest`) realizan llamadas reales contra los servicios Docker. Asegúrate de tener levantados tus contenedores antes de iniciar:
+```bash
+docker compose up -d
+```
+
+#### Configuración de Propiedades locales de Test
+Las pruebas utilizan el perfil `test` ubicado en `src/test/resources/application-test.properties`. 
+Este archivo está ignorado en Git por motivos de seguridad. Para configurarlo la primera vez:
+1. Copia la plantilla del archivo `.example`:
+   ```bash
+   cp src/test/resources/application-test.properties.example src/test/resources/application-test.properties
+   ```
+2. El archivo de ejemplo utiliza `${JWT_SECRET}` dinámico de tu entorno local, pero puedes editar el archivo `application-test.properties` si deseas sobreescribir las URLs locales de tus microservicios o usar una clave estática.
+
+#### Ejecutar la Suite de Pruebas
+Ejecuta las pruebas desde el directorio raíz del proyecto con el comando estándar de Maven Wrapper:
+
+*   **En Windows (PowerShell/CMD):**
+    ```powershell
+    .\mvnw.cmd test
+    ```
+*   **En Linux / macOS:**
+    ```bash
+    ./mvnw test
+    ```
+
+#### Correr un test específico
+Si solo quieres correr un conjunto de pruebas específico:
+*   **Pruebas unitarias de JWT:**
+    ```bash
+    ./mvnw test -Dtest=JwtUtilTest
+    ```
+*   **Pruebas de Rate Limiter:**
+    ```bash
+    ./mvnw test -Dtest=InMemorySlidingWindowRateLimiterTest
+    ```
+*   **Pruebas de Integración (contra Docker):**
+    ```bash
+    ./mvnw test -Dtest=GatewayIntegrationTest
+    ```
+
+---
 
 ## 📝 Logging
 
 Formato de logs con métricas de tiempo:
 
-```
-[+] Ruta pública: /auth/login
-[➡️] POST http://localhost:8080/auth/login
+```text
+[+] Ruta pública: /auth/api/v1/login
+[➡️] POST http://localhost:9000/auth/api/v1/login
 [⬅️] Status: 200 OK - Tiempo: 142 ms
 
-[!] Ruta protegida: /api/v1/plate/detect
-[+] Token válido para: jarod
-[➡️] GET http://localhost:8080/api/v1/plate/detect
+[!] Ruta protegida: /core/api/v1/health
+[+] Token válido para: admin@correo.com
+[➡️] GET http://localhost:9000/core/api/v1/health
 [⬅️] Status: 200 OK - Tiempo: 45 ms
 ```
 
+---
+
 ## 📁 Estructura del Proyecto
 
-```
+```text
 gateway/
 ├── src/
 │   ├── main/
@@ -177,9 +229,11 @@ gateway/
 │   │   │   └── com/evecta/gateway/
 │   │   │       ├── GatewayApplication.java
 │   │   │       ├── config/
-│   │   │       │   └── SecurityConfig.java
+│   │   │       │   ├── SecurityConfig.java
+│   │   │       │   └── RateLimitProperties.java
 │   │   │       ├── filter/
-│   │   │       │   └── JwtAuthenticationFilter.java
+│   │   │       │   ├── JwtAuthenticationFilter.java
+│   │   │       │   └── RateLimitingFilter.java
 │   │   │       ├── util/
 │   │   │       │   └── JwtUtil.java
 │   │   │       └── exception/
@@ -192,12 +246,10 @@ gateway/
 └── README.md
 ```
 
+---
+
 ## ⚙️ Requisitos
 
-- Java 17+
-- Maven 3.6+
-- Microservicios destino en puertos 8081, 8082, 8083 (configurable)
-
-```
-
-Este README profesional incluye toda la información necesaria para entender, configurar y ejecutar el gateway. ¿Necesitas ajustar algún detalle?
+*   Java 17+
+*   Maven 3.6+
+*   Entorno Docker (para pruebas de integración contra servicios de base)

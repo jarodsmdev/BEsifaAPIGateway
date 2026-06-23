@@ -82,7 +82,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
                 .flatMap(validationResult -> {
                     if (!"valid".equals(validationResult)) {
                         log.warn("[-] Token revocado o no válido en base de datos: {}", validationResult);
-                        
+
                         String friendlyMessage = "Token inválido o no proporcionado";
                         if ("Token ha sido revocado".equals(validationResult)) {
                             friendlyMessage = "Se ha iniciado sesión en otro dispositivo o su sesión ha sido invalidada.";
@@ -91,7 +91,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
                         } else if (validationResult != null && validationResult.contains("conexión")) {
                             friendlyMessage = "Error de conexión con el servicio de autenticación.";
                         }
-                        
+
                         return unauthorizedResponse(exchange, friendlyMessage);
                     }
 
@@ -111,7 +111,6 @@ public class JwtAuthenticationFilter implements GlobalFilter {
                 });
     }
 
-    @SuppressWarnings("null")
     private Mono<Void> unauthorizedResponse(ServerWebExchange exchange, String message) {
         ServerHttpResponse response = exchange.getResponse();
 

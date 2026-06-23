@@ -1,0 +1,39 @@
+# ============================================================================
+# PLANTILLA DE PERFIL DE TEST — Copiar a application-test.properties
+# ============================================================================
+
+# JWT (mismo secret que auth-service)
+# Puedes inyectar la variable JWT_SECRET en el entorno o rellenar el valor aquí
+jwt.secret=${JWT_SECRET}
+
+# URLs de los servicios Docker (puertos expuestos en localhost)
+AUTH_SERVICE_URL=http://localhost:8081
+PLATE_SERVICE_URL=http://localhost:8000
+CORE_SERVICE_URL=http://localhost:8083
+
+# Puerto del gateway en tests
+server.port=0
+
+# Deshabilitar Swagger en tests para evitar ruido
+springdoc.api-docs.enabled=false
+springdoc.swagger-ui.enabled=false
+
+# Rate limiting reducido para tests
+rate-limit.rules[0].path-pattern=/auth/api/v1/**
+rate-limit.rules[0].max-requests=200
+rate-limit.rules[0].window-seconds=60
+
+rate-limit.rules[1].path-pattern=/core/api/v1/**
+rate-limit.rules[1].max-requests=200
+rate-limit.rules[1].window-seconds=60
+
+rate-limit.rules[2].path-pattern=/plate/api/v1/**
+rate-limit.rules[2].max-requests=200
+rate-limit.rules[2].window-seconds=60
+
+rate-limit.rules[3].path-pattern=/**
+rate-limit.rules[3].max-requests=500
+rate-limit.rules[3].window-seconds=60
+
+# Logging en tests
+logging.level.com.evecta.gateway=DEBUG
