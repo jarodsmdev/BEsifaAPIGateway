@@ -200,6 +200,19 @@ Si solo quieres correr un conjunto de pruebas específico:
     ./mvnw test -Dtest=GatewayIntegrationTest
     ```
 
+#### 📊 Cobertura de Código (Code Coverage)
+El proyecto utiliza **JaCoCo** para medir el porcentaje de código cubierto por las pruebas automatizadas.
+
+Para generar el reporte de cobertura:
+1. Corre la suite de pruebas completa:
+   ```bash
+   ./mvnw test
+   ```
+2. JaCoCo generará un reporte HTML interactivo. Puedes abrirlo directamente en tu navegador desde el archivo local en tu proyecto:
+   `target/site/jacoco/index.html`
+
+Este reporte te mostrará de forma visual (líneas verdes para cubiertas, rojas para no cubiertas) la cobertura exacta de cada clase Java.
+
 ---
 
 ## 📝 Logging
