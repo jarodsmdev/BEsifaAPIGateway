@@ -11,34 +11,35 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
-    @Bean
-    public CorsWebFilter corsWebFilter() {
+        @Bean
+        public CorsWebFilter corsWebFilter() {
 
-        CorsConfiguration config = new CorsConfiguration();
+                CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://sifacore.netlify.app"
-        ));
+                config.setAllowedOrigins(List.of(
+                                "http://localhost:5173",
+                                "https://sifacore.netlify.app",
+                                "https://sifacore2.netlify.app",
+                                "http://sifacore.s3-website-us-east-1.amazonaws.com",
+                                "https://sifacore.s3.us-east-1.amazonaws.com"
+                        ));
 
-        config.setAllowedMethods(List.of(
-                "GET",
-                "POST",
-                "PUT",
-                "DELETE",
-                "PATCH",
-                "OPTIONS"
-        ));
+                config.setAllowedMethods(List.of(
+                                "GET",
+                                "POST",
+                                "PUT",
+                                "DELETE",
+                                "PATCH",
+                                "OPTIONS"));
 
-        config.setAllowedHeaders(List.of("*"));
+                config.setAllowedHeaders(List.of("*"));
 
-        config.setAllowCredentials(true);
+                config.setAllowCredentials(true);
 
-        UrlBasedCorsConfigurationSource source =
-                new UrlBasedCorsConfigurationSource();
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration("/**", config);
+                source.registerCorsConfiguration("/**", config);
 
-        return new CorsWebFilter(source);
-    }
+                return new CorsWebFilter(source);
+        }
 }
