@@ -8,6 +8,13 @@ import org.springframework.web.cors.reactive.CorsWebFilter;
 
 import java.util.List;
 
+/**
+ * Configuración CORS del API Gateway.
+ * 
+ * allowCredentials(true) es REQUERIDO para que las cookies HttpOnly
+ * se envíen en peticiones cross-origin. Cuando se usan credenciales,
+ * no se puede usar "*" como origen: se lista explícitamente cada origen.
+ */
 @Configuration
 public class CorsConfig {
 
@@ -16,6 +23,7 @@ public class CorsConfig {
 
                 CorsConfiguration config = new CorsConfiguration();
 
+                // Orígenes permitidos (no se puede usar "*" con allowCredentials=true)
                 config.setAllowedOrigins(List.of(
                                 "http://localhost:5173",
                                 "https://sifacore.netlify.app",
@@ -32,9 +40,19 @@ public class CorsConfig {
                                 "PATCH",
                                 "OPTIONS"));
 
-                config.setAllowedHeaders(List.of("*"));
+                config.setAllowedHeaders(List.of(
+                                "Authorization",
+                                "Content-Type",
+                                "X-Requested-With",
+                                "X-Client-Origin"));
 
+                // Permitir credenciales (cookies HttpOnly) en peticiones cross-origin
                 config.setAllowCredentials(true);
+
+                // Exponer Set-Cookie para que el navegador procese las cookies de sesión
+                config.setExposedHeaders(List.of("Set-Cookie"));
+
+                config.setMaxAge(3600L);
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 
