@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -25,6 +26,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
     private static final String AUTH_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ACCESS_TOKEN_COOKIE = "access_token";
 
     private final JwtUtil jwtUtil;
     private final TokenValidationService tokenValidationService;
@@ -64,14 +66,15 @@ public class JwtAuthenticationFilter implements GlobalFilter {
         // Rutas protegidas - Validar token LOCALMENTE
         log.info("[!] Ruta protegida: {}", path);
 
-        String authHeader = request.getHeaders().getFirst(AUTH_HEADER);
+        // Obtener el token desde la cookie httpOnly (preferente) o header Authorization (fallback para apps móviles)
+        TokenSource tokenSource = extractToken(request);
 
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+        if (tokenSource == null) {
             log.warn("[-] Token no proporcionado");
             return unauthorizedResponse(exchange, "Token no proporcionado");
         }
 
-        String token = authHeader.substring(BEARER_PREFIX.length());
+        final String token = tokenSource.token();
 
         if (!jwtUtil.validateToken(token)) {
             log.warn("[-] Token inválido o expirado localmente (firma/expiración)");
@@ -100,8 +103,15 @@ public class JwtAuthenticationFilter implements GlobalFilter {
                     String rolesString = rolesList != null ? String.join(",", rolesList) : "";
                     log.info("[+] Token válido. Usuario: {} | Roles: {}", username, rolesString);
 
+                    // Construir el header Authorization para reenviarlo a los servicios downstream.
+                    // Si el token venía de una cookie, se construye "Bearer <token>".
+                    // Si venía del header original, se conserva.
+                    final String forwardedAuthHeader = tokenSource.authHeader() != null
+                            ? tokenSource.authHeader()
+                            : BEARER_PREFIX + token;
+
                     ServerHttpRequest mutatedRequest = request.mutate()
-                            .header(AUTH_HEADER, authHeader)
+                            .header(AUTH_HEADER, forwardedAuthHeader)
                             .header("X-Auth-User", username)
                             .header("X-Auth-Roles", rolesString)
                             .header("X-Auth-Token-Valid", "true")
@@ -109,6 +119,58 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
                     return chain.filter(exchange.mutate().request(mutatedRequest).build());
                 });
+    }
+
+    /**
+     * Record que encapsula el token extraído y el header Authorization original.
+     * 
+     * @param token      Token JWT extraído
+     * @param authHeader Header Authorization original (null si el token vino de cookie)
+     */
+    private record TokenSource(String token, String authHeader) {
+    }
+
+    /**
+     * Extrae el token JWT desde la cookie httpOnly o el header Authorization.
+     * 
+     * Preferencia de extracción:
+     * 1. Cookie access_token (aplicaciones web con cookies HttpOnly)
+     * 2. Header Authorization: Bearer <token> (fallback para apps móviles)
+     * 
+     * @param request La petición HTTP reactiva
+     * @return TokenSource con el token y header, o null si no hay token
+     */
+    private TokenSource extractToken(ServerHttpRequest request) {
+        // 1. Intentar con cookie httpOnly
+        String token = getAccessTokenFromCookie(request);
+        if (token != null) {
+            return new TokenSource(token, null);
+        }
+
+        // 2. Fallback: header Authorization
+        final String authHeader = request.getHeaders().getFirst(AUTH_HEADER);
+        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+            return new TokenSource(authHeader.substring(BEARER_PREFIX.length()), authHeader);
+        }
+
+        return null;
+    }
+
+    /**
+     * Extrae el access token JWT desde la cookie httpOnly.
+     * 
+     * En el API Gateway (WebFlux/Reactive), las cookies se leen
+     * desde el ServerHttpRequest de forma reactiva.
+     * 
+     * @param request La petición HTTP reactiva
+     * @return El valor de la cookie access_token, o null si no existe
+     */
+    private String getAccessTokenFromCookie(ServerHttpRequest request) {
+        HttpCookie cookie = request.getCookies().getFirst(ACCESS_TOKEN_COOKIE);
+        if (cookie == null) {
+            return null;
+        }
+        return cookie.getValue();
     }
 
     @SuppressWarnings("null")
