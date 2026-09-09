@@ -23,6 +23,13 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
+    // Claims estándar para validación defense-in-depth
+    @Value("${jwt.issuer}")
+    private String issuer;
+
+    @Value("${jwt.audience}")
+    private String audience;
+
     private SecretKey getSigningKey() {
         byte[] keyBytes;
         try {
@@ -36,12 +43,14 @@ public class JwtUtil {
     /**
      * SOLO VALIDA - NO GENERA TOKENS
      * El auth-service es el único que debe generar tokens
+     * Valida: firma, expiración, issuer y audience
      */
     public boolean validateToken(String token) {
-        // Esto debe validar usando la clave secreta, NO llamando a otro servicio
         try {
             Jwts.parser()
                     .verifyWith(getSigningKey())
+                    .requireIssuer(issuer)
+                    .requireAudience(audience)
                     .build()
                     .parseSignedClaims(token);
             return true;
