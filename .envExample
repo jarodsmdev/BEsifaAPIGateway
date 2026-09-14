@@ -1,0 +1,10 @@
+APP_NAME=nombre_app
+SERVER_PORT=puerto
+JWT_SECRET=clave_secreta
+INTERNAL_JWT_SECRET=clave_secreta
+JWT_ISSUER=issuer_para_jwt
+JWT_AUDIENCE=audience_para_jwt
+AUTH_SERVICE_URL=url_servicio_auth
+PLATE_SERVICE_URL=url_servicio_plate
+CORE_SERVICE_URL=url_servicio_core
+DASHBOARD_SERVICE_URL=url_dashboard
