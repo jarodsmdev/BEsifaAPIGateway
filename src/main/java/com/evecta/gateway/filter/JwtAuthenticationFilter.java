@@ -12,6 +12,7 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import com.evecta.gateway.service.TokenValidationService;
+import com.evecta.gateway.util.InternalTokenService;
 import com.evecta.gateway.util.JwtUtil;
 import reactor.core.publisher.Mono;
 
@@ -30,10 +31,13 @@ public class JwtAuthenticationFilter implements GlobalFilter {
 
     private final JwtUtil jwtUtil;
     private final TokenValidationService tokenValidationService;
+    private final InternalTokenService internalTokenService;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, TokenValidationService tokenValidationService) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, TokenValidationService tokenValidationService,
+                                   InternalTokenService internalTokenService) {
         this.jwtUtil = jwtUtil;
         this.tokenValidationService = tokenValidationService;
+        this.internalTokenService = internalTokenService;
     }
 
     @Override
@@ -110,11 +114,24 @@ public class JwtAuthenticationFilter implements GlobalFilter {
                             ? tokenSource.authHeader()
                             : BEARER_PREFIX + token;
 
+                    // Token interno de corta duración (60s) que core-sifa valida para
+                    // confiar en la identidad. El rol proviene del JWT de sesión YA validado.
+                    String internalToken = internalTokenService.generateToken(username, rolesList);
+
                     ServerHttpRequest mutatedRequest = request.mutate()
-                            .header(AUTH_HEADER, forwardedAuthHeader)
-                            .header("X-Auth-User", username)
-                            .header("X-Auth-Roles", rolesString)
-                            .header("X-Auth-Token-Valid", "true")
+                            // Se eliminan las cabeceras entrantes X-Auth-* (posible intento de
+                            // suplantación con acceso directo) y se regeneran con valores
+                            // verificados a partir del JWT de sesión validado.
+                            .headers(headers -> {
+                                headers.remove("X-Auth-User");
+                                headers.remove("X-Auth-Roles");
+                                headers.remove("X-Auth-Token-Valid");
+                                headers.set(AUTH_HEADER, forwardedAuthHeader);
+                                headers.set("X-Auth-User", username);
+                                headers.set("X-Auth-Roles", rolesString);
+                                headers.set("X-Auth-Token-Valid", "true");
+                                headers.set("X-Auth-Identity", internalToken);
+                            })
                             .build();
 
                     return chain.filter(exchange.mutate().request(mutatedRequest).build());
