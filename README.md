@@ -10,16 +10,17 @@ API Gateway desarrollado con Spring Cloud Gateway que actúa como punto único d
 ```
 Cliente → API Gateway (9000) → Microservicios
 ├── Auth Service (8081)
-├── Plate Service (8082)
-└── Dashboard Service (8083)
+├── Plate Service (8000)
+└── Core Service (8083)
 ```
 
 ## 🚀 Características
 
 - **Enrutamiento dinámico**: Redirección basada en paths hacia los microservicios correspondientes
 - **Validación JWT**: Verificación local de tokens sin dependencia del auth-service
-- **Headers de auditoría**: Inyección de `X-Auth-User` y `X-Auth-Token-Valid` en peticiones autenticadas
-- **Rutas públicas**: `/auth/login` y `/auth/register` sin validación de token
+- **Headers de auditoría**: Sustituye cualquier `X-Auth-*` entrante por valores verificados y añade `X-Auth-Identity` (JWT interno) en peticiones autenticadas
+- **Canal interno**: Añade `X-Internal-Key` a cada petición reenviada, para que los servicios bajos puedan descartar llamadas que no vengan del gateway
+- **Rutas públicas**: `/auth/api/v1/**` y la documentación de Swagger sin validación de token
 - **Manejo de errores**: Respuestas amigables para servicios no disponibles
 - **Métricas de tiempo**: Logging de duración de peticiones
 
@@ -39,41 +40,52 @@ Cliente → API Gateway (9000) → Microservicios
 
 ```bash
 # .env
-JWT_SECRET=lTt8Yu2kri039ApfbTcY6Omiq8cCfCb8uLsE5DZS+oY=
+JWT_SECRET=<openssl rand -hex 32>
+JWT_ISSUER=sifa-clients
+JWT_AUDIENCE=sifa-clients
+INTERNAL_JWT_SECRET=<openssl rand -hex 32>   # debe ser el mismo en auth y core
+INTERNAL_JWT_ISSUER=sifa-gateway
+INTERNAL_JWT_AUDIENCE=sifa-core
+INTERNAL_CHANNEL_KEY=<openssl rand -hex 32>  # debe ser el mismo en auth, core y plate
 AUTH_SERVICE_URL=http://localhost:8081
-PLATE_SERVICE_URL=http://localhost:8082
-DASHBOARD_SERVICE_URL=http://localhost:8083
+PLATE_SERVICE_URL=http://localhost:8000
+CORE_SERVICE_URL=http://localhost:8083
 ```
+
+> `INTERNAL_JWT_SECRET` y `INTERNAL_CHANNEL_KEY` son secretos compartidos: el
+> valor tiene que ser idéntico en gateway, auth y core (y `INTERNAL_CHANNEL_KEY`
+> también en plate), porque uno lo firma y el resto lo verifica.
 
 ### application.properties
 
+El listado `spring.cloud.gateway.routes[]` está en el fichero
+[`src/main/resources/application.properties`](src/main/resources/application.properties).
+Los índices deben ser contiguos: si se añade o elimina una ruta hay que
+renumerar el resto, porque Spring enlaza la propiedad como `List` y un hueco
+deja un `null` que acaba en un `NPE`.
+
 ```properties
-spring.application.name=${APP_NAME:gateway}
-server.port=${SERVER_PORT:8080}
-jwt.secret=${JWT_SECRET}
+spring.cloud.gateway.routes[0].id=auth-service
+spring.cloud.gateway.routes[0].uri=${AUTH_SERVICE_URL}
+spring.cloud.gateway.routes[0].predicates[0]=Path=/auth/api/v1/**
 
-# Enrutamiento
-spring.cloud.gateway.server.webflux.routes[0].id=auth-service
-spring.cloud.gateway.server.webflux.routes[0].uri=${AUTH_SERVICE_URL}
-spring.cloud.gateway.server.webflux.routes[0].predicates[0]=Path=/auth/**
-
-spring.cloud.gateway.server.webflux.routes[1].id=plate-service
-spring.cloud.gateway.server.webflux.routes[1].uri=${PLATE_SERVICE_URL}
-spring.cloud.gateway.server.webflux.routes[1].predicates[0]=Path=/api/v1/plate/**
-
-spring.cloud.gateway.server.webflux.routes[2].id=dashboard-service
-spring.cloud.gateway.server.webflux.routes[2].uri=${DASHBOARD_SERVICE_URL}
-spring.cloud.gateway.server.webflux.routes[2].predicates[0]=Path=/api/v1/dashboard/**
+spring.cloud.gateway.routes[1].id=plate-service
+spring.cloud.gateway.routes[1].uri=${PLATE_SERVICE_URL}
+spring.cloud.gateway.routes[1].predicates[0]=Path=/plate/api/v1/**
 ```
 
 ## 🗺️ Rutas
 
 | Ruta | Método | Protección | Destino |
 |------|--------|------------|---------|
-| `/auth/login` | POST | Pública | Auth Service (8081) |
-| `/auth/register` | POST | Pública | Auth Service (8081) |
-| `/api/v1/plate/**` | * | JWT | Plate Service (8082) |
-| `/api/v1/dashboard/**` | * | JWT | Dashboard Service (8083) |
+| `/auth/api/v1/**` | * | Pública | Auth Service (8081) |
+| `/plate/api/v1/**` | * | JWT | Plate Service (8000) |
+| `/core/api/v1/**` | * | JWT | Core Service (8083) |
+| `/core/v3/api-docs`, `/auth/v3/api-docs`, `/plate/openapi.json` | GET | Pública | Documentación de cada servicio |
+
+Todas las rutas protegidas aceptan el token desde la cookie httpOnly
+`access_token` o, como fallback para apps móviles, desde
+`Authorization: Bearer <token>`.
 
 ## 🔐 Headers hacia Microservicios
 
@@ -81,7 +93,14 @@ spring.cloud.gateway.server.webflux.routes[2].predicates[0]=Path=/api/v1/dashboa
 |--------|-------|-------------|
 | `Authorization` | `Bearer {token}` | Token JWT original |
 | `X-Auth-User` | `{username}` | Username extraído del token |
+| `X-Auth-Roles` | `{rol1,rol2}` | Roles extraídos del token |
 | `X-Auth-Token-Valid` | `true` | Indicador de validación exitosa |
+| `X-Auth-Identity` | `{JWT interno}` | JWT de 60 s firmado por el gateway; es el único que core-sifa acepta como identidad |
+| `X-Internal-Key` | `{INTERNAL_CHANNEL_KEY}` | Firma del canal interno; lo añade el gateway y lo exigen los servicios bajos |
+
+Las cabeceras `X-Auth-*` que lleguen del cliente **se eliminan siempre** antes de
+reenviar, tanto en rutas públicas como protegidas, para que nadie pueda colar una
+identidad forjada llegando directo al servicio.
 
 ## 📊 Respuestas de Error
 
@@ -196,7 +215,7 @@ gateway/
 
 - Java 17+
 - Maven 3.6+
-- Microservicios destino en puertos 8081, 8082, 8083 (configurable)
+- Microservicios destino en puertos 8081, 8000, 8083 (configurable)
 
 ```
 
