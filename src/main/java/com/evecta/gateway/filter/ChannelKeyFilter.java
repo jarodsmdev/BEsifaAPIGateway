@@ -31,7 +31,7 @@ public class ChannelKeyFilter implements GlobalFilter {
 
     private static final Logger log = LoggerFactory.getLogger(ChannelKeyFilter.class);
 
-    static final String CHANNEL_KEY_HEADER = "X-Internal-Key";
+    public static final String CHANNEL_KEY_HEADER = "X-Internal-Key";
 
     private final String channelKey;
 
