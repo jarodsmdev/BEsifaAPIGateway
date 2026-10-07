@@ -51,10 +51,21 @@ public class JwtAuthenticationFilter implements GlobalFilter {
             return exchange.getResponse().setComplete();
         }
 
+        // Las cabeceras X-Auth-* nunca deben atravesar el gateway tal como llegan:
+        // un cliente que se conecte directamente al servicio podría forjarlas.
+        // Se descartan siempre; la rama protegida las regenera a partir del JWT
+        // ya validado y las públicas no deben portar ninguna identidad.
+        ServerHttpRequest sanitized = request.mutate().headers(headers -> {
+            headers.remove("X-Auth-User");
+            headers.remove("X-Auth-Roles");
+            headers.remove("X-Auth-Token-Valid");
+            headers.remove("X-Auth-Identity");
+        }).build();
+
         // Rutas públicas (no requieren token)
         if (path.startsWith("/auth/api/v1/")) {
             log.info("[+] Ruta pública (auth): {}", path);
-            return chain.filter(exchange);
+            return chain.filter(exchange.mutate().request(sanitized).build());
         }
 
         if (path.startsWith("/swagger-ui") ||
@@ -64,7 +75,7 @@ public class JwtAuthenticationFilter implements GlobalFilter {
                 path.startsWith("/webjars")) {
 
             log.info("[+] Acceso libre concedido a recursos de documentación: {}", path);
-            return chain.filter(exchange);
+            return chain.filter(exchange.mutate().request(sanitized).build());
         }
 
         // Rutas protegidas - Validar token LOCALMENTE
@@ -118,14 +129,10 @@ public class JwtAuthenticationFilter implements GlobalFilter {
                     // confiar en la identidad. El rol proviene del JWT de sesión YA validado.
                     String internalToken = internalTokenService.generateToken(username, rolesList);
 
-                    ServerHttpRequest mutatedRequest = request.mutate()
-                            // Se eliminan las cabeceras entrantes X-Auth-* (posible intento de
-                            // suplantación con acceso directo) y se regeneran con valores
-                            // verificados a partir del JWT de sesión validado.
+                    // A partir de la petición ya saneada se (re)generan las cabeceras
+                    // con valores verificados a partir del JWT de sesión.
+                    ServerHttpRequest mutatedRequest = sanitized.mutate()
                             .headers(headers -> {
-                                headers.remove("X-Auth-User");
-                                headers.remove("X-Auth-Roles");
-                                headers.remove("X-Auth-Token-Valid");
                                 headers.set(AUTH_HEADER, forwardedAuthHeader);
                                 headers.set("X-Auth-User", username);
                                 headers.set("X-Auth-Roles", rolesString);
