@@ -5,7 +5,8 @@ services:
     ports:
       # Solo loopback: en producción el gateway es el único con IP pública
       # (ver deploy_SIFA-GATEWAY.sh).
-      - "127.0.0.1:9000:9000"
+      - "9000:9000"
+      #- "127.0.0.1:9000:9000"
     env_file:
       - .env
     networks:
